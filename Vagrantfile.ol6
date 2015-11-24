@@ -1,0 +1,69 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# provisioning scripts start
+$set_tz = <<SCRIPT
+ln -s -f /usr/share/zoneinfo/#{$tz} /etc/localtime
+SCRIPT
+
+$yum_install = <<SCRIPT
+echo "proxy=http://www-proxy.us.oracle.com:80" >> /etc/yum.conf
+yum -y update
+yum -y groupinstall "X Window System" "Desktop" "Fonts" "General Purpose Desktop"
+yum -y install yum-utils
+yum-config-manager --enable public_ol6_addons
+yum -y install tigervnc-server
+yum -y install emacs
+yum -y install firefox
+yum -y install docker-engine
+echo "export HTTP_PROXY="http://www-proxy.us.oracle.com:80" >> /etc/sysconfig/docker
+echo "export HTTPS_PROXY="http://www-proxy.us.oracle.com:80" >> /etc/sysconfig/docker
+service docker start
+chkconfig docker on
+SCRIPT
+
+# provisioning scripts end
+
+# vm configuration
+nodes_config = (JSON.parse(File.read("nodes.json")))['nodes']
+
+VAGRANTFILE_API_VERSION = "2"
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+ config.vm.box = "oel6.6-x86_64"
+ config.vm.box_url = "http://slc06chi.us.oracle.com/repo/ip2/Vagrant/OEL-6.6-x86_64.box"
+
+  nodes_config.each do |node|
+    node_name = node[0] # name of node
+    node_values = node[1] # content of node
+    
+    config.vm.define node_name do |config|
+      # configures all forwarding ports in JSON array
+      ports = node_values['ports']
+      ports.each do |port|
+        config.vm.network :forwarded_port,
+        host: port[':host'],
+        guest: port[':guest'],
+        id: port[':id']
+      end
+      
+      config.vm.hostname = node_values[':node']
+#
+#      config.vm.network :private_network, ip: node_values[':ip']
+#
+# Note: 
+# bridge: "eth0" specifies the host's network interface which should 
+# be used for the bridge (for the VM the network interface will be
+# determined dynamically)
+#
+      config.vm.network :public_network, type: "dhcp", bridge: "eth0"
+      
+      config.vm.provider :virtualbox do |vb|
+        vb.customize ["modifyvm", :id, "--memory", node_values[':memory']]
+        vb.customize ["modifyvm", :id, "--name", node_values[':node']]
+      end
+     config.vm.provision "shell", inline: $set_tz
+     config.vm.provision "shell", inline: $yum_install
+    end
+  end
+end 
