@@ -7,7 +7,7 @@ ln -s -f /usr/share/zoneinfo/US/Pacific /etc/localtime
 SCRIPT
 
 $yum_install = <<SCRIPT
-echo "proxy=http://www-proxy.us.oracle.com:80" >> /etc/yum.conf
+# echo "proxy=http://www-proxy.us.oracle.com:80" >> /etc/yum.conf
 # enable Yum repository containing Docker 
 yum-config-manager --enable ol7_addons
 # yum update to refresh the local yum repository information
