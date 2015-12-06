@@ -7,9 +7,20 @@ ln -s -f /usr/share/zoneinfo/US/Pacific /etc/localtime
 SCRIPT
 
 $yum_install = <<SCRIPT
+# yum proxy
 echo "proxy=http://www-proxy.us.oracle.com:80" >> /etc/yum.conf
-# enable Yum repository containing Docker 
-yum-config-manager --enable ol7_addons
+# curl proxy
+### setup curl HTTP proxy
+export http_proxy=http://www-proxy.us.oracle.com:80
+export https_proxy=https://www-proxy.us.oracle.com:80
+# enable Yum repository containing Docker (Note: Docker version in ol7_addons is not the latest) 
+# yum-config-manager --enable ol7_addons 
+echo "[dockerrepo] \n\
+name=Docker Repository \n\
+baseurl=https://yum.dockerproject.org/repo/main/oraclelinux/7 \n\
+enabled=1 \n\
+gpgcheck=1 \n\
+gpgkey=https://yum.dockerproject.org/gpg \n" > /etc/yum.repos.d/docker.repo
 # yum update to refresh the local yum repository information
 yum -y update
 # enable X11 Windows desktop
@@ -19,24 +30,24 @@ dd if=/dev/zero of=/swapfile bs=1M count=1024
 mkswap /swapfile
 swapon /swapfile
 echo "/swapfile       swap       swap       defaults       0 0" >> /etc/fstab
-# vncserver
-yum -y install tigervnc-server
-# emacs
-yum -y install emacs
-# firefox
-yum -y install firefox
-# docker
-yum -y install docker-engine
-# configure Docker service to use http proxy (to download Docker containers)
-echo  "[Service] 
-Environment=\"HTTP_PROXY=http://www-proxy.us.oracle.com:80\"
-Environment=\"HTTPS_PROXY=http://www-proxy.us.oracle.com:80\"" >  /etc/systemd/system/docker.service.d/http-proxy.conf
+# vncserver, emacs, firefox, docker 
+yum -y install tigervnc-server emacs firefox docker-engine openconnect
 # activate the new Docker service setting
 systemctl daemon-reload
 # start the Docker service
 systemctl start docker.service
 # start the Docker service every time the OS is restarted
 systemctl enable docker.service
+# configure Docker service to use http proxy (to download Docker containers)
+mkdir -p /etc/systemd/system/docker.service.d
+echo  "[Service] \n\
+Environment=\"HTTP_PROXY=http://www-proxy.us.oracle.com:80\" \n\
+Environment=\"HTTPS_PROXY=http://www-proxy.us.oracle.com:80\"\n" >  /etc/systemd/system/docker.service.d/http-proxy.conf
+# docker compose
+curl -L https://github.com/docker/compose/releases/download/1.5.2/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+# use docker client command without sudo
+usermod -a -G docker vagrant
 # Yum cache clean up to free up diskspace (approx. 500 MByte)
 yum clean all
 SCRIPT
